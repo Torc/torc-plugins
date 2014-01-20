@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title></title>
+        <style type="text/css">
+        
+        * {
+             -webkit-touch-callout: none; /* prevent callout to copy image, etc when tap to hold */
+             -webkit-text-size-adjust: none; /* prevent webkit from resizing text to fit */
+             /* make transparent link selection, adjust last value opacity 0 to 1.0 */
+             -webkit-tap-highlight-color: rgba(0,0,0,0);
+             -webkit-user-select: none; /* prevent copy paste, to allow, change 'none' to 'text' */
+             -webkit-tap-highlight-color: rgba(0,0,0,0);
+            }
+        </style>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0"/>
+
+        <link rel="stylesheet" href="css/bootstrap.min.css">
+        <style>
+            body {
+                padding-top: 50px;
+                padding-bottom: 20px;
+            }
+        </style>
+        <link rel="stylesheet" href="css/bootstrap-theme.min.css">
+        <script src="js/vendor/modernizr-2.6.2-respond-1.1.0.min.js"></script>
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="chromeframe">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">activate Google Chrome Frame</a> to improve your experience.</p>
+        <![endif]-->
+    <div id="topbar" class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand torc-application-name" href="#">Torc</a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class="torc-socket-status"></span> <b class="caret"></b></a>
+              <ul class="dropdown-menu torc-peer-menu">
+              </ul>
+            </li>
+          </ul>
+        </div><!--/.navbar-collapse -->
+      </div>
+    </div>
+    <div><canvas id="torc-canvas" style="display:block;background-color:#ccccff"/></div>
+
+    <script src="js/vendor/jquery-1.10.1.min.js"></script>
+    <script src="js/vendor/bootstrap.min.js"></script>
+    <script src="js/torcconfiguration.js"></script>
+    <script src="js/torcwebsocket.js"></script>
+    <script src="js/torcsubscription.js"></script>
+    <script src="js/torcconnection.js"></script>
+    <script>
+$(document).ready(function() {
+    "use strict";
+
+    var torcconnection, startX, startY, currentX, currentY, id;
+    var canvas = document.getElementById('torc-canvas');
+    var topbar = document.getElementById('topbar');
+    var context = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - topbar.offsetHeight;
+        window.scrollTo(0,0); 
+    }
+
+    window.onorientationchanged = resizeCanvas;
+    window.onresize = resizeCanvas;
+    resizeCanvas();
+
+    setInterval(drawCanvas, 50);
+
+    if ('createTouch' in document) {
+        canvas.addEventListener('touchstart', onTouchStart, false);
+        canvas.addEventListener('touchmove',  onTouchMove,  false);
+        canvas.addEventListener('touchend',   onTouchEnd,   false);
+    } else {
+        canvas.addEventListener('mousemove',  onMouseMove,  false);
+        canvas.addEventListener('mousedown',  onMouseDown,  false);
+        canvas.addEventListener('mouseup',    onMouseUp,    false);
+        canvas.addEventListener('mouseout',   onMouseOut,   false);
+    }
+
+    function drawCanvas() {
+        context.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+
+        if (id !== undefined) {
+            context.beginPath();
+            context.fillStyle = '#ccffcc99';
+            context.arc(currentX - canvas.offsetLeft, currentY - canvas.offsetTop, 48, 0, Math.PI * 2, true);
+            context.stroke();
+            context.beginPath();
+            context.strokeStyle = 'black';
+            context.lineWidth = 2;
+            context.arc(startX - canvas.offsetLeft, startY - canvas.offsetTop, 50, 0, Math.PI * 2, true);
+            context.stroke();
+        }
+    }
+
+    function onTouchStart(event) {
+        if (id !== undefined || event.changedTouches.length < 1) {
+            return;
+        }
+
+        id = event.changedTouches[0].identifier;
+        startX = currentX = event.changedTouches[0].clientX;
+        startY = currentY = event.changedTouches[0].clientY;
+    }
+
+    function onTouchMove(event) {
+        event.preventDefault();
+
+        if (id === undefined) {
+            return;
+        }
+
+        for (var i = 0; i < event.changedTouches.length; i++) {
+            if (event.changedTouches[i].identifier === id) {
+                currentX = event.changedTouches[i].clientX;
+                currentY = event.changedTouches[i].clientY;
+                setSpeed(startX - currentX, startY - currentY);
+                break;
+            }
+        }
+    }
+
+    function onTouchEnd(event) {
+        if (id === undefined) {
+            return;
+        }
+
+        for (var i = 0; i < event.changedTouches.length; i++) {
+            if (event.changedTouches[i].identifier === id) {
+                id = undefined;
+                setSpeed(0, 0);
+                break;
+            }
+        }
+    }
+
+    function onMouseDown(event) {
+        if (id === undefined) {
+            startX = currentX = event.clientX;
+            startY = currentY = event.clientY;
+            id = event.button;
+        }
+    }
+
+    function onMouseUp(event) {
+        if (id !== undefined && event.button === id) {
+            id = undefined;
+            setSpeed(0, 0);
+        }
+    }
+
+    function onMouseMove(event) {
+        if (id !== undefined) {
+            currentX = event.clientX;
+            currentY = event.clientY;
+            setSpeed(startX - currentX, startY - currentY);
+        }
+    }
+
+    function onMouseOut(event) {
+        id = undefined;
+        setSpeed(0, 0);
+    }
+
+    function setSpeed(left, right) {
+        torcconnection.call('wiringpi', 'SetSpeedRight', {'Speed' : right});
+    }
+
+    function speedChanged(name, value) {
+        console.log(name + ": " + value);
+    }
+
+    function speedSubscriptionChanged(version, methods, properties) {
+        if (version !== undefined && typeof properties === 'object') {
+            speedChanged('speedLeft', properties.speedLeft.value);
+            speedChanged('speedRight', properties.speedRight.value);
+            return;
+        }
+
+        speedChanged('speedLeft', 0);
+        speedChanged('speedRight', 0);
+    }
+
+    function statusChanged (status) {
+        $(".torc-socket-status").text(status);
+
+        if (status === torc.SocketNotConnected) {
+            // remove current address details
+            $(".torc-socket-address").remove();
+        } else if (status === torc.SocketConnected) {
+            $(".torc-peer-menu").append($('<li/>',
+                                         { class: "torc-socket-address",
+                                           html: $('<a/>', { href: '#', html: torc.ConnectedTo + window.location.host }),} ));
+        } else if (status === torc.SocketReady) {
+            torcconnection.subscribe('wiringpi', ['speedLeft', 'speedRight'], speedChanged, speedSubscriptionChanged);
+        }
+    }
+
+    $(".torc-application-name").text(torc.ServerApplication);
+    statusChanged(torc.SocketNotConnected);
+    torcconnection = new TorcConnection($, torc, statusChanged);
+});
+</script>
+    </body>
+</html>
+
